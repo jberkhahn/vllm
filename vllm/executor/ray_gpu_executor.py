@@ -61,6 +61,7 @@ class RayGPUExecutor(DistributedGPUExecutor):
             os.environ["RAY_USAGE_STATS_ENABLED"] = "0"
 
         # Create the parallel GPU workers.
+        assert placement_group is not None
         self._init_workers_ray(placement_group)
 
         self.input_encoder = msgspec.msgpack.Encoder(enc_hook=encode_hook)

@@ -29,6 +29,19 @@ class WorkerBase(ABC):
     communicate request metadata to other workers.
     """
 
+    #device: torch.device
+    @property
+    def device(self):
+       torch.device
+
+    @abstractmethod
+    def _execute_model_spmd(
+        self,
+        execute_model_req: ExecuteModelRequest,
+        intermediate_tensors: Optional[IntermediateTensors] = None,
+    ) -> Optional[List[SamplerOutput]]:
+        raise NotImplementedError
+
     @abstractmethod
     def init_device(self) -> None:
         """Initialize device state, such as loading the model or other on-device

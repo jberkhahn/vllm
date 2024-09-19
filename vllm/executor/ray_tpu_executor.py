@@ -45,6 +45,7 @@ class RayTPUExecutor(TPUExecutor):
             os.environ["RAY_USAGE_STATS_ENABLED"] = "0"
 
         # Create the parallel TPU workers.
+        assert placement_group is not None
         self._init_workers_ray(placement_group)
 
     def _init_workers_ray(self, placement_group: "PlacementGroup",

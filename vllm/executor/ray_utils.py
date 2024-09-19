@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import msgspec
 
+
 from vllm.config import ParallelConfig
 from vllm.executor.msgspec_utils import decode_hook, encode_hook
 from vllm.logger import init_logger
@@ -49,7 +50,7 @@ try:
             self, req_or_tuple: Union[bytes,
                                       Tuple[bytes,
                                             Optional[IntermediateTensors]]]
-        ) -> bytes:
+        ) -> Union[bytes, Tuple[bytes, Optional[IntermediateTensors]]]:
             """Execute model in SPMD fashion: used only when SPMD worker and
             compiled DAG are both enabled.
 
@@ -70,19 +71,19 @@ try:
             # on a background thread, so we need to reset torch's current
             # device.
             import torch
+            assert self.worker is not None
             if not self.compiled_dag_cuda_device_set:
                 torch.cuda.set_device(self.worker.device)
                 self.compiled_dag_cuda_device_set = True
-
             output = self.worker._execute_model_spmd(execute_model_req,
                                                      intermediate_tensors)
             # Pipeline model request and output to the next pipeline stage.
             if isinstance(output, IntermediateTensors):
-                output = serialized_req, output
+                ret_output = serialized_req, output
             else:
-                output = self.output_encoder.encode(output)
+                ret_output = self.output_encoder.encode(output)
 
-            return output
+            return ret_output
 
     ray_import_err = None
 
