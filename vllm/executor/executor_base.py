@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
 from vllm.config import (CacheConfig, DeviceConfig, LoadConfig, LoRAConfig,
                          ModelConfig, ObservabilityConfig, ParallelConfig,
@@ -49,6 +49,28 @@ class ExecutorBase(ABC):
     @abstractmethod
     def _init_executor(self) -> None:
         pass
+
+    @abstractmethod
+    def _create_worker(self,
+                       local_rank: int = 0,
+                       rank: int = 0,
+                       distributed_init_method: Optional[str] = None):
+        """Creates but the worker backend for the Executor.
+       """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _run_workers(
+        self,
+        method: str,
+        *args,
+        async_run_remote_workers_only: bool = False,
+        max_concurrent_workers: Optional[int] = None,
+        **kwargs,
+    ) -> Any:
+        """Runs the given method on all workers.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def determine_num_available_blocks(self) -> Tuple[int, int]:

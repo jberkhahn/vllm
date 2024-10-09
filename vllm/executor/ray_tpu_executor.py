@@ -216,11 +216,7 @@ class RayTPUExecutor(TPUExecutor):
         method: str,
         *args,
         async_run_remote_workers_only: bool = False,
-        all_args: Optional[List[Tuple[Any, ...]]] = None,
-        all_kwargs: Optional[List[Dict[str, Any]]] = None,
-        use_dummy_driver: bool = False,
         max_concurrent_workers: Optional[int] = None,
-        use_ray_compiled_dag: bool = False,
         **kwargs,
     ) -> Any:
         """Runs the given method on all workers. Can be used in the following
@@ -240,10 +236,10 @@ class RayTPUExecutor(TPUExecutor):
                 "max_concurrent_workers is not supported yet.")
 
         count = len(self.workers)
-        all_worker_args = repeat(args, count) if all_args is None \
-            else islice(all_args, 1, None)
-        all_worker_kwargs = repeat(kwargs, count) if all_kwargs is None \
-            else islice(all_kwargs, 1, None)
+        all_worker_args = repeat(args, count) if "all_args" not in kwargs \
+            else islice(kwargs["all_args"], 1, None)
+        all_worker_kwargs = repeat(kwargs, count) if "all_kwargs" not in kwargs \
+            else islice(kwargs["all_kwargs"], 1, None)
 
         # Start the ray workers first.
         ray_worker_outputs = [
@@ -256,11 +252,11 @@ class RayTPUExecutor(TPUExecutor):
             # Just return futures
             return ray_worker_outputs
 
-        driver_args = args if all_args is None else all_args[0]
-        driver_kwargs = kwargs if all_kwargs is None else all_kwargs[0]
+        driver_args = args if "all_args" not in kwargs else kwargs["all_args"][0]
+        driver_kwargs = kwargs if "all_kwargs" not in kwargs else kwargs["all_kwargs"][0]
 
         # Start the driver worker after all the ray workers.
-        if not use_dummy_driver:
+        if "use_dummy_driver" in kwargs and kwargs["use_dummy_driver"]:
             driver_worker_output = self.driver_worker.execute_method(
                 method, *driver_args, **driver_kwargs)
         else:
