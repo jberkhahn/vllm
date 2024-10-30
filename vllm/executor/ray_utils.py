@@ -11,7 +11,7 @@ from vllm.logger import init_logger
 from vllm.platforms import current_platform
 from vllm.sequence import ExecuteModelRequest, IntermediateTensors
 from vllm.utils import get_ip, is_hip, is_xpu
-from vllm.worker.worker_base import WorkerWrapperBase
+from vllm.worker.worker_base import SpmdWorkerWrapperBase
 
 logger = init_logger(__name__)
 PG_WAIT_TIMEOUT = 1800
@@ -27,7 +27,7 @@ try:
         from ray._private.state import state as _state
         available_resources_per_node = _state._available_resources_per_node
 
-    class RayWorkerWrapper(WorkerWrapperBase):
+    class RayWorkerWrapper(SpmdWorkerWrapperBase):
         """Ray wrapper for vllm.worker.Worker, allowing Worker to be
         lazliy initialized after Ray sets CUDA_VISIBLE_DEVICES."""
 

@@ -29,6 +29,8 @@ class WorkerBase(ABC):
     communicate request metadata to other workers.
     """
 
+    device : Optional[torch.device] = None
+
     @abstractmethod
     def init_device(self) -> None:
         """Initialize device state, such as loading the model or other on-device
@@ -100,6 +102,19 @@ class WorkerBase(ABC):
     def list_loras(self) -> Set[int]:
         raise NotImplementedError
 
+class SpmdWorkerBase(WorkerBase):
+    @abstractmethod
+    def _execute_model_spmd(
+        self,
+        execute_model_req: ExecuteModelRequest,
+        intermediate_tensors: Optional[IntermediateTensors] = None
+    ) -> Optional[List[SamplerOutput]]:
+        """
+        Execute model in Single Program Multiple Data (SPMD) fashion.
+        All workers take the same request, prepare the input and
+        execute the model.
+        """
+        raise NotImplementedError
 
 class LoraNotSupportedWorkerBase(WorkerBase):
     """Partial implementation of WorkerBase that raises exceptions when LoRA
@@ -168,7 +183,7 @@ class WorkerInput:
         return tensor_dict
 
 
-class LocalOrDistributedWorkerBase(WorkerBase):
+class LocalOrDistributedWorkerBase(SpmdWorkerBase):
     """
     Partial implementation of WorkerBase that has a default `execute_model`
     definition to perform metadata transfer between workers when in distributed
@@ -483,3 +498,6 @@ def extract_previous_hidden_states(
             .hidden_states
 
     return output
+
+class SpmdWorkerWrapperBase(WorkerWrapperBase):
+    worker: Optional[SpmdWorkerBase] = None
