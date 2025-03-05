@@ -87,6 +87,19 @@ class LoRARequest(
         return isinstance(value,
                           self.__class__) and self.lora_name == value.lora_name
 
+    def __dict__(self) -> dict:
+        """
+        Allows LoRARequests to easily be serialized to JSON.
+        """
+        return {
+               "lora_name": self.lora_name,
+               "lora_int_id": self.lora_int_id,
+               "lora_path": self.lora_path,
+               "lora_local_path": self.lora_local_path,
+               "long_lora_max_len": self.long_lora_max_len,
+               "base_model_name": self.base_model_name,
+       }
+
     def __hash__(self) -> int:
         """
         Overrides the hash method to hash LoRARequest instances

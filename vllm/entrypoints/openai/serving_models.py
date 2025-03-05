@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import os
 import pathlib
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Optional, Union
 
+import vllm.envs as envs
 from vllm.config import ModelConfig
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.openai.protocol import (ErrorResponse,
@@ -20,6 +22,8 @@ from vllm.utils import AtomicCounter
 
 logger = init_logger(__name__)
 
+ADAPTER_CACHE = os.path.join(envs.VLLM_CONFIG_ROOT, "adapters")
+os.makedirs(ADAPTER_CACHE, exist_ok=True)
 
 @dataclass
 class BaseModelPath:
@@ -169,6 +173,10 @@ class OpenAIServingModels:
             return create_error_response(message=str(e),
                                          err_type=error_type,
                                          status_code=status_code)
+
+        adapter_cache_file = open(os.path.join(ADAPTER_CACHE, lora_request.lora_name), "w")
+        json.dump(lora_request.__dict__(), adapter_cache_file)
+        adapter_cache_file.close()
 
         self.lora_requests.append(lora_request)
         logger.info("Loaded new LoRA adapter: name '%s', path '%s'", lora_name,

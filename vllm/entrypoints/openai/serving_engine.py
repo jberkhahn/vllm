@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import json
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -32,7 +33,7 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               TokenizeChatRequest,
                                               TokenizeCompletionRequest,
                                               TranscriptionRequest)
-from vllm.entrypoints.openai.serving_models import OpenAIServingModels
+from vllm.entrypoints.openai.serving_models import ADAPTER_CACHE, OpenAIServingModels
 from vllm.entrypoints.openai.tool_parsers import ToolParser
 # yapf: enable
 from vllm.inputs import TokensPrompt
@@ -153,6 +154,15 @@ class OpenAIServing:
         for prompt_adapter in self.models.prompt_adapter_requests:
             if request.model == prompt_adapter.prompt_adapter_name:
                 return None, prompt_adapter
+        if request.model:
+            cached_adapter_path = os.path.join(ADAPTER_CACHE, request.model)
+            if os.path.exists(cached_adapter_path):
+                cached_adapter_file = open(cached_adapter_path, request.model)
+                adapter_json = json.load(cached_adapter_file)
+                if adapter_json["lora_name"]:
+                    lora = LoRARequest(**adapter_json)
+                    self.models.lora_requests.append(lora)
+                    return lora, None
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
 
