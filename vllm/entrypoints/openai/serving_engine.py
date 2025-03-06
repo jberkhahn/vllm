@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import json
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -10,6 +11,7 @@ from fastapi import Request
 from pydantic import Field
 from starlette.datastructures import Headers
 
+import vllm.envs as envs
 from vllm.config import ModelConfig
 from vllm.engine.protocol import EngineClient
 # yapf conflicts with isort for this block
@@ -27,7 +29,9 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               DetokenizeRequest,
                                               EmbeddingChatRequest,
                                               EmbeddingCompletionRequest,
-                                              ErrorResponse, RerankRequest,
+                                              ErrorResponse,
+                                              LoadLoRAAdapterRequest,
+                                              RerankRequest,
                                               ScoreRequest,
                                               TokenizeChatRequest,
                                               TokenizeCompletionRequest,
@@ -141,7 +145,7 @@ class OpenAIServing:
             err_type="NotFoundError",
             status_code=HTTPStatus.NOT_FOUND)
 
-    def _maybe_get_adapters(
+    async def _maybe_get_adapters(
         self, request: AnyRequest
     ) -> Union[tuple[None, None], tuple[LoRARequest, None], tuple[
             None, PromptAdapterRequest]]:
@@ -153,6 +157,21 @@ class OpenAIServing:
         for prompt_adapter in self.models.prompt_adapter_requests:
             if request.model == prompt_adapter.prompt_adapter_name:
                 return None, prompt_adapter
+        if request.model and envs.VLLM_ADAPTER_DIR is not None:
+            adapter_path = os.path.join(envs.VLLM_ADAPTER_DIR, request.model)
+            adapter_config_path = os.path.join(adapter_path, "adapter_config.json")
+            if os.path.exists(adapter_config_path):
+                f = open(adapter_config_path, "r")
+                adapter_config = json.load(f)
+                if adapter_config["peft_type"] == "LORA":
+                    lora_request = LoadLoRAAdapterRequest(
+                        lora_name = request.model,
+                        lora_path =  adapter_path,
+                    )
+                    response = await self.models.load_lora_adapter(lora_request)
+                    if isinstance(response, ErrorResponse):
+                        raise ValueError(response.message)
+                return None, None
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
 

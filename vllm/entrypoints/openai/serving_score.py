@@ -239,7 +239,7 @@ class ServingScores(OpenAIServing):
         (
             lora_request,
             prompt_adapter_request,
-        ) = self._maybe_get_adapters(request)
+        ) = await self._maybe_get_adapters(request)
 
         if prompt_adapter_request is not None:
             raise NotImplementedError("Prompt adapter is not supported "
