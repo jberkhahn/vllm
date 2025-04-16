@@ -2,6 +2,7 @@
 
 # imports for guided decoding tests
 import json
+import random
 import re
 import shutil
 from tempfile import TemporaryDirectory
@@ -25,6 +26,7 @@ MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
 # technically these adapters use a different base model,
 # but we're not testing generation quality here
 LORA_NAME = "typeof/zephyr-7b-beta-lora"
+CACHED_LORA_NAME = f"zephyr-7b-beta-lora-{random.random()}"
 PA_NAME = "swapnilbp/llama_tweet_ptune"
 # if PA_NAME changes, PA_NUM_VIRTUAL_TOKENS might also
 # need to change to match the prompt adapter
@@ -36,6 +38,16 @@ GUIDED_DECODING_BACKENDS = ["outlines", "lm-format-enforcer", "xgrammar"]
 @pytest.fixture(scope="module")
 def zephyr_lora_files():
     return snapshot_download(repo_id=LORA_NAME)
+
+
+@pytest.fixture(scope='module')
+def lora_adapter_cache(request, tmpdir_factory, zephyr_lora_files):
+    # Create dir that mimics the structure of the lora_adapter cache
+    adapter_cache = tmpdir_factory.mktemp(
+        request.module.__name__) / "lora_adapter_cache"
+    model_files = adapter_cache / CACHED_LORA_NAME
+    shutil.copytree(zephyr_lora_files, model_files)
+    return adapter_cache
 
 
 @pytest.fixture(scope="module")
@@ -94,10 +106,16 @@ def default_server_args(zephyr_lora_files, zephyr_lora_added_tokens_files,
 
 @pytest.fixture(scope="module",
                 params=["", "--disable-frontend-multiprocessing"])
-def server(default_server_args, request):
+def server(default_server_args, request, lora_adapter_cache):
     if request.param:
         default_server_args.append(request.param)
-    with RemoteOpenAIServer(MODEL_NAME, default_server_args) as remote_server:
+    lora_env = {
+        "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "True",
+        "VLLM_LORA_RESOLVER_CACHE_DIR": lora_adapter_cache,
+        "VLLM_PLUGINS": "lora_filesystem_resolver",
+    }
+    with RemoteOpenAIServer(MODEL_NAME, default_server_args,
+                            env_dict=lora_env) as remote_server:
         yield remote_server
 
 
@@ -142,6 +160,24 @@ async def test_single_completion(client: openai.AsyncOpenAI, model_name: str,
     )
     assert len(completion.choices[0].text) >= 1
     assert completion.choices[0].prompt_logprobs is None
+
+
+@pytest.mark.asyncio
+async def test_cached_lora_completion(client: openai.AsyncOpenAI,
+                                      lora_adapter_cache):
+    completion = await client.completions.create(model=MODEL_NAME,
+                                                 prompt="Hello, my name is",
+                                                 max_tokens=5,
+                                                 temperature=0.0)
+    assert completion.choices[0].text == " Sarah and I am a"
+
+    lora_completion = await client.completions.create(
+        model=CACHED_LORA_NAME,
+        prompt="Hello, my name is",
+        max_tokens=5,
+        temperature=0.0)
+    assert completion.choices[0].text != lora_completion.choices[0].text
+    assert lora_completion.choices[0].text == " Sarah and I am a"
 
 
 @pytest.mark.asyncio
