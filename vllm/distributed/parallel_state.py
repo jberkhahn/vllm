@@ -29,6 +29,7 @@ import weakref
 from collections import namedtuple
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from datetime import timedelta
 from multiprocessing import shared_memory
 from typing import Any, Callable, Optional, Union
 from unittest.mock import patch
@@ -972,6 +973,7 @@ def init_distributed_environment(
     distributed_init_method: str = "env://",
     local_rank: int = -1,
     backend: str = "nccl",
+    timeout: timedelta = None,
 ):
     logger.debug(
         "world_size=%d rank=%d local_rank=%d "
@@ -1008,7 +1010,8 @@ def init_distributed_environment(
             backend=backend,
             init_method=distributed_init_method,
             world_size=world_size,
-            rank=rank)
+            rank=rank,
+            timeout=timeout)
     # set the local rank
     # local_rank is not available in torch ProcessGroup,
     # see https://github.com/pytorch/pytorch/issues/122816
